@@ -1,70 +1,55 @@
-﻿using System;
-using System.Linq;
+﻿using System.Web;
 
 namespace BuiltWebServer.Server.HTTP
 {
     public class Request
     {
         public Method Method { get; private set; }
-
         public string Url { get; private set; }
-
-        public HeaderCollection Headers { get; private set; }
-
+        public HeaderCollection Headers { get; private set; } = new();
         public string Body { get; private set; }
+        public Dictionary<string, string> FormData { get; private set; } = new();
 
-        public static Request Parse(string requestString)
+        public static Request Parse(string request)
         {
-            string[] lines = requestString
-                .Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = request.Split("\r\n");
+            string[] start = lines[0].Split(' ');
 
-            string[] startLine = lines[0].Split(' ');
-            Method method = ParseMethod(startLine[0]);
-            string url = startLine[1];
-
-            var headerLines = lines
-                .Skip(1)
-                .TakeWhile(l => l.Contains(":"))
-                .ToArray();
-
-            HeaderCollection headers = ParseHeaders(headerLines);
-
-            string body = string.Join(
-                Environment.NewLine,
-                lines.Skip(1 + headerLines.Length));
-
-            return new Request
+            Request req = new()
             {
-                Method = method,
-                Url = url,
-                Headers = headers,
-                Body = body
+                Method = Enum.Parse<Method>(start[0]),
+                Url = start[1]
             };
-        }
 
-        private static Method ParseMethod(string method)
-        {
-            if (!Enum.TryParse(method, out Method parsed))
+            int i = 1;
+            while (!string.IsNullOrEmpty(lines[i]))
             {
-                throw new InvalidOperationException("Invalid HTTP method.");
+                string[] parts = lines[i].Split(':', 2);
+                req.Headers.Add(parts[0], parts[1].Trim());
+                i++;
             }
 
-            return parsed;
+            req.Body = string.Join("\n", lines.Skip(i + 1));
+            req.FormData = ParseForm(req.Headers, req.Body);
+
+            return req;
         }
 
-        private static HeaderCollection ParseHeaders(string[] lines)
+        private static Dictionary<string, string> ParseForm(HeaderCollection headers, string body)
         {
-            HeaderCollection headers = new HeaderCollection();
+            Dictionary<string, string> form = new();
 
-            foreach (var line in lines)
+            if (!headers.Contains(Header.ContentTypeHeader)) return form;
+            if (headers[Header.ContentTypeHeader].Value != ContentType.Form) return form;
+
+            foreach (var pair in body.Split('&'))
             {
-                string[] parts = line.Split(':', 2);
-                if (parts.Length != 2) continue;
-
-                headers.Add(new Header(parts[0], parts[1].Trim()));
+                var parts = pair.Split('=');
+                form[HttpUtility.UrlDecode(parts[0])] =
+                    HttpUtility.UrlDecode(parts[1]);
             }
 
-            return headers;
+            return form;
         }
     }
 }

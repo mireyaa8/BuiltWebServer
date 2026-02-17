@@ -1,26 +1,25 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
 
 namespace BuiltWebServer.Server.HTTP
 {
-    public class HeaderCollection
+    public class HeaderCollection : IEnumerable<Header>
     {
-        private readonly Dictionary<string, Header> headers;
+        private readonly Dictionary<string, Header> headers = new();
 
-        public HeaderCollection()
+        public Header this[string name]
         {
-            headers = new Dictionary<string, Header>();
+            get => headers[name];
+            set => headers[name] = value;
         }
 
-        public int Count => headers.Count;
+        public bool Contains(string name) => headers.ContainsKey(name);
 
-        public void Add(Header header)
+        public void Add(string name, string value)
         {
-            headers[header.Name] = header;
+            headers[name] = new Header(name, value);
         }
 
-        public IEnumerable<Header> All()
-        {
-            return headers.Values;
-        }
+        public IEnumerator<Header> GetEnumerator() => headers.Values.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

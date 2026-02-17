@@ -1,20 +1,24 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using BuiltWebServer.Server.HTTP;
+using BuiltWebServer.Server.Responses;
+using BuiltWebServer.Server.Routing;
 
 namespace BuiltWebServer.Server
 {
     public class HttpServer
     {
-        private const int BufferSize = 1024;
-        private const int MaxRequestSize = 10 * 1024;
         private readonly TcpListener listener;
-        public HttpServer(IPAddress ipAddress, int port)
+        private readonly IRoutingTable routingTable;
+
+        public HttpServer(Action<IRoutingTable> routes)
         {
-            listener = new TcpListener(ipAddress, port);
+            listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
+            routingTable = new RoutingTable();
+            routes(routingTable);
         }
+
         public void Start()
         {
             listener.Start();
@@ -26,39 +30,39 @@ namespace BuiltWebServer.Server
                 NetworkStream stream = client.GetStream();
 
                 string requestText = ReadRequest(stream);
-                Console.WriteLine(requestText);
+                Request request = Request.Parse(requestText);
 
-                Response response = new Response(StatusCode.Ok, "Hello from BuiltWebServer!");
-                byte[] responseBytes = Encoding.UTF8.GetBytes(response.ToString());
+                Response response = routingTable.MatchRequest(request);
 
-                stream.Write(responseBytes, 0, responseBytes.Length);
+                response.PreRenderAction?.Invoke(request, response);
+
+                WriteResponse(stream, response);
 
                 stream.Close();
                 client.Close();
             }
         }
+
         private string ReadRequest(NetworkStream stream)
         {
-            byte[] buffer = new byte[BufferSize];
+            byte[] buffer = new byte[1024];
             StringBuilder sb = new StringBuilder();
-            int totalBytes = 0;
+            int bytes;
 
-            int bytesRead;
             do
             {
-                bytesRead = stream.Read(buffer, 0, buffer.Length);
-                totalBytes += bytesRead;
-
-                if (totalBytes > MaxRequestSize)
-                {
-                    throw new InvalidOperationException("Request too large.");
-                }
-
-                sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-
-            } while (stream.DataAvailable);
+                bytes = stream.Read(buffer);
+                sb.Append(Encoding.UTF8.GetString(buffer, 0, bytes));
+            }
+            while (stream.DataAvailable);
 
             return sb.ToString();
+        }
+
+        private void WriteResponse(NetworkStream stream, Response response)
+        {
+            byte[] data = Encoding.UTF8.GetBytes(response.ToString());
+            stream.Write(data);
         }
     }
 }
