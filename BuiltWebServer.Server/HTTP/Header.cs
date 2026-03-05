@@ -5,6 +5,8 @@
         public const string ContentTypeHeader = "Content-Type";
         public const string ContentLength = "Content-Length";
         public const string Location = "Location";
+        public const string CookieHeaderName = "Cookie";
+        public const string SetCookieHeaderName = "Set-Cookie";
 
         public Header(string name, string value)
         {

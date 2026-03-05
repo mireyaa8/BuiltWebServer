@@ -12,6 +12,20 @@ namespace BuiltWebServer.Server
         private readonly TcpListener listener;
         private readonly IRoutingTable routingTable;
 
+        private void AddSession(Request request, Response response)
+        {
+            if (!request.Cookies.Contains(Session.SessionCookieName))
+            {
+                response.Cookies.Add(
+                    new Cookie(Session.SessionCookieName, request.Session.Id));
+            }
+
+            if (!request.Session.ContainsKey(Session.CurrentDateKey))
+            {
+                request.Session[Session.CurrentDateKey] =
+                    DateTime.UtcNow.ToString();
+            }
+        }
         public HttpServer(Action<IRoutingTable> routes)
         {
             listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
@@ -19,11 +33,12 @@ namespace BuiltWebServer.Server
             routes(routingTable);
         }
 
+
         public void Start()
         {
             listener.Start();
             Console.WriteLine("Server started on http://localhost:8080");
-
+            AddSession(request, response);
             while (true)
             {
                 TcpClient client = listener.AcceptTcpClient();
@@ -40,9 +55,10 @@ namespace BuiltWebServer.Server
 
                 stream.Close();
                 client.Close();
+                AddSession(request, response);
             }
-        }
 
+        }
         private string ReadRequest(NetworkStream stream)
         {
             byte[] buffer = new byte[1024];
