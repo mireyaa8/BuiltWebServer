@@ -7,12 +7,6 @@ namespace BuiltWebServer
 {
     internal class Program
     {
-        private const string HtmlForm = @"<form action='/HTML' method='POST'>
-Name: <input type='text' name='Name'/>
-Age: <input type='number' name='Age'/>
-<input type='submit' value='Save'/>
-</form>";
-
         private const string LoginForm = @"<form action='/Login' method='POST'>
 Username: <input name='Username'/>
 Password: <input name='Password'/>
@@ -24,80 +18,91 @@ Password: <input name='Password'/>
             HttpServer server = new HttpServer(routes =>
             {
                 routes
-                    .MapGet("/", new TextResponse("Hello from my server, now with routing table!!!"))
-                    .MapGet("/HTML", new HtmlResponse(HtmlForm))
-                    .MapPost("/HTML", new TextResponse("", AddFormData))
-                    .MapGet("/Redirect", new RedirectResponse("https://softuni.org"))
-                    .MapGet("/Session", new TextResponse("", ShowSession))
+                    .MapGet("/", new TextResponse("Server working"))
+                    .MapGet("/Session", new TextResponse("", AsyncSession))
                     .MapGet("/Login", new HtmlResponse(LoginForm))
-                    .MapPost("/Login", new HtmlResponse("", LoginAction))
-                    .MapGet("/Logout", new TextResponse("", LogoutAction))
-                    .MapGet("/UserProfile", new HtmlResponse("", UserProfile));
+                    .MapPost("/Login", new HtmlResponse("", AsyncLogin))
+                    .MapGet("/Logout", new TextResponse("", AsyncLogout))
+                    .MapGet("/UserProfile", new HtmlResponse("", AsyncProfile));
             });
 
             server.Start();
         }
 
-        private static void AddFormData(Request request, Response response)
+        private static async void AsyncSession(Request request, Response response)
         {
-            response.Body.Clear();
-
-            foreach (var pair in request.FormData)
+            await Task.Run(() =>
             {
-                response.Body.AppendLine($"{pair.Key}: {pair.Value}");
-            }
+                if (!request.Cookies.Contains(Session.SessionCookieName))
+                {
+                    response.Cookies.Add(
+                        new Cookie(Session.SessionCookieName, request.Session.Id));
+                }
+
+                if (!request.Session.ContainsKey(Session.CurrentDateKey))
+                {
+                    request.Session[Session.CurrentDateKey] =
+                        DateTime.UtcNow.ToString();
+
+                    response.Body.Append("Session created!");
+                }
+                else
+                {
+                    response.Body.Append(
+                        request.Session[Session.CurrentDateKey]);
+                }
+            });
         }
 
-        private static void ShowSession(Request request, Response response)
+        private static async void AsyncLogin(Request request, Response response)
         {
-            if (request.Session.ContainsKey(Session.CurrentDateKey))
+            await Task.Run(() =>
             {
-                response.Body.Append(request.Session[Session.CurrentDateKey]);
-            }
-            else
-            {
-                response.Body.Append("Current date stored!");
-            }
+                request.Session.Clear();
+
+                string username = request.FormData["Username"];
+                string password = request.FormData["Password"];
+
+                if (username == "user" && password == "user123")
+                {
+                    request.Session[Session.UserKey] = username;
+
+                    response.Cookies.Add(
+                        new Cookie(Session.SessionCookieName, request.Session.Id));
+
+                    response.Body.Append("Login successful!");
+                }
+                else
+                {
+                    response.Body.Append(LoginForm);
+                }
+            });
         }
 
-        private static void LoginAction(Request request, Response response)
+        private static async void AsyncLogout(Request request, Response response)
         {
-            request.Session.Clear();
-
-            string username = request.FormData["Username"];
-            string password = request.FormData["Password"];
-
-            if (username == "user" && password == "user123")
+            await Task.Run(() =>
             {
-                request.Session[Session.UserKey] = username;
-
-                response.Cookies.Add(
-                    new Cookie(Session.SessionCookieName, request.Session.Id));
-
-                response.Body.Append("Login successful!");
-            }
-            else
-            {
-                response.Body.Append(LoginForm);
-            }
+                request.Session.Clear();
+                response.Body.Append("Logged out!");
+            });
         }
 
-        private static void LogoutAction(Request request, Response response)
+        private static async void AsyncProfile(Request request, Response response)
         {
-            request.Session.Clear();
-            response.Body.Append("Logged out!");
-        }
-
-        private static void UserProfile(Request request, Response response)
-        {
-            if (request.Session.ContainsKey(Session.UserKey))
+            await Task.Run(() =>
             {
-                response.Body.Append($"Hello {request.Session[Session.UserKey]}");
-            }
-            else
-            {
-                response.Body.Append("Not logged in. <a href='/Login'>Login</a>");
-            }
+                if (request.Session.ContainsKey(Session.UserKey))
+                {
+                    response.Body.Append(
+                        $"Hello {request.Session[Session.UserKey]}");
+                }
+                else
+                {
+                    response.Body.Append(
+                        "Not logged in <a href='/Login'>Login</a>");
+                }
+            });
         }
     }
 }

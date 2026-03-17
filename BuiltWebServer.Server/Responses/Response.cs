@@ -30,7 +30,6 @@ namespace BuiltWebServer.Server.Responses
                 sb.AppendLine($"{Header.SetCookieHeaderName}: {cookie}");
 
             sb.AppendLine();
-
             sb.Append(Body.ToString());
 
             return sb.ToString();

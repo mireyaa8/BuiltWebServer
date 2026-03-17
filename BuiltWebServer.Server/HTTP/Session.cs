@@ -8,12 +8,11 @@ namespace BuiltWebServer.Server.HTTP
         public const string CurrentDateKey = "CurrentDate";
         public const string UserKey = "User";
 
-        private readonly Dictionary<string, string> data;
+        private readonly Dictionary<string, string> data = new();
 
         public Session(string id)
         {
             Id = id;
-            data = new Dictionary<string, string>();
         }
 
         public string Id { get; }
